@@ -10,9 +10,10 @@ from supabase import create_client, Client
 # =========================
 # Supabase 接続設定
 # =========================
-# 事前に環境変数にセットしておくこと
-#   SUPABASE_URL=...
-#   SUPABASE_SERVICE_ROLE_KEY=...
+# Render 側の Environment で
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+# が設定されている前提
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 
@@ -33,12 +34,20 @@ FEEDS = [
         "source": "Google Blog (全体)",
         "url": "https://blog.google/feed/",
     },
-    # ここに増やしていく:
-    # {"source": "DeepMind Blog", "url": "https://deepmind.com/blog/feed/basic"},
-    # {"source": "Google Research Blog", "url": "https://research.google/blog/feed/"},
-    # {"source": "Zenn LLM", "url": "https://zenn.dev/topics/llm/feed"},
-    #
-    # 個人ブログ・技術ブログ
+    {
+        "source": "DeepMind Blog",
+        "url": "https://deepmind.google/discover/blog/feed",
+    },
+    {
+        "source": "Google Research Blog",
+        "url": "https://research.google/blog/feed/",
+    },
+    # 日本語コミュニティ例
+    {
+        "source": "Zenn LLM",
+        "url": "https://zenn.dev/topics/llm/feed",
+    },
+    # ここに個人ブログ・技術ブログなどを追加していく想定:
     # {"source": "Example AI Blog", "url": "https://example.com/feed"},
     #
     # ※ X(Twitter) や一部のSNSは公式RSSがないので、
@@ -100,7 +109,7 @@ def save_entry(feed_source: str, entry) -> None:
         "summary": summary,
         "content_raw": content_raw,
         "published_at": published_at,  # None でもOK
-        # category / tags / importance は後で LLM で埋める想定
+        # category / tags / importance などは後で LLM で埋める想定
     }
 
     # INSERT 実行
