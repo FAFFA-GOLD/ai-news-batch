@@ -27,10 +27,22 @@ FEEDS = [
         "url": "https://openai.com/news/rss.xml",
     },
     {
+        "source": "Google Blog (全体)",
+        "url": "https://blog.google/feed/",
+    },
+    {
+        "source": "DeepMind Blog",
+        "url": "https://deepmind.google/discover/blog/feed",
+    },
+    {
+        "source": "Google Research Blog",
+        "url": "https://research.google/blog/feed/",
+    },
+    {
         "source": "Zenn LLM",
         "url": "https://zenn.dev/topics/llm/feed",
     },
-    # 必要に応じて追加
+    # ここに今後どんどん追加していく
 ]
 
 
@@ -38,7 +50,10 @@ FEEDS = [
 # ユーティリティ
 # =========================
 def parse_published(entry) -> Optional[datetime]:
-    """RSS の published / updated から datetime を作る。"""
+    """
+    RSS の published / updated から datetime を作る。
+    取れなければ None を返す。
+    """
     struct = getattr(entry, "published_parsed", None) or getattr(
         entry, "updated_parsed", None
     )
@@ -57,7 +72,7 @@ def fetch_article_content(url: str) -> Optional[str]:
             url,
             timeout=10,
             headers={
-                # シンプルな User-Agent（ブロックされにくくするため）
+                # ブロックされにくい程度の User-Agent
                 "User-Agent": "Mozilla/5.0 (compatible; AI-News-Fetcher/1.0)",
             },
         )
@@ -68,22 +83,21 @@ def fetch_article_content(url: str) -> Optional[str]:
 
     soup = BeautifulSoup(resp.text, "html.parser")
 
-    # script / style は削除
+    # 不要なタグを削除
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()
 
-    # よくある本文候補を優先
+    # よくある本文候補を優先的に探索
     candidates = []
     if soup.find("article"):
         candidates.append(soup.find("article"))
     if soup.find("main"):
         candidates.append(soup.find("main"))
-    # class 名に article, content を含むものも候補に
     candidates += soup.select("[class*='article'], [class*='content']")
 
     for c in candidates:
         text = c.get_text(separator="\n", strip=True)
-        if text and len(text) > 200:  # ある程度長さがあるものを本文とみなす
+        if text and len(text) > 200:  # ある程度の長さがあれば本文とみなす
             return text
 
     # 候補がダメなら <body> 全体からテキストだけ抜く
@@ -104,8 +118,15 @@ def save_entry(feed_source: str, entry) -> None:
         print(f"Skip entry without url/title from {feed_source}")
         return
 
+    # RSS 上の要約（抜粋）
     summary = getattr(entry, "summary", None)
-    published_at = parse_published(entry)
+
+    # 公開日時
+    published_dt = parse_published(entry)
+    if published_dt is not None:
+        published_at = published_dt.isoformat()
+    else:
+        published_at = None
 
     # 既存 URL チェック（重複防止）
     existing = (
@@ -118,8 +139,10 @@ def save_entry(feed_source: str, entry) -> None:
     if existing.data:
         return
 
-    # まずは本文を取りに行く（失敗したら summary を fallback に）
-    content_raw = fetch_article_content(url) or summary
+    # 本文テキストを取得（失敗したら None）
+    content_text = fetch_article_content(url)
+    # content_raw はいったん summary をそのまま入れておく（既存互換）
+    content_raw = summary
 
     row = {
         "source": feed_source,
@@ -127,6 +150,7 @@ def save_entry(feed_source: str, entry) -> None:
         "title": title,
         "summary": summary,
         "content_raw": content_raw,
+        "content_text": content_text or summary,  # 本文優先、ダメなら要約で埋める
         "published_at": published_at,
     }
 
@@ -135,13 +159,16 @@ def save_entry(feed_source: str, entry) -> None:
 
 
 def fetch_all() -> None:
-    """登録された全フィードを巡回して Supabase に保存するメイン処理。"""
+    """
+    登録された全フィードを巡回して Supabase に保存するメイン処理。
+    """
     for feed in FEEDS:
         source = feed["source"]
         url = feed["url"]
 
         print(f"=== Fetching: {source} ({url}) ===")
         d = feedparser.parse(url)
+
         entries = getattr(d, "entries", [])
         print(f" -> {len(entries)} entries")
 
