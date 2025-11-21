@@ -1,0 +1,33 @@
+name: AI News Cron
+
+on:
+  schedule:
+    # UTC で 22時 / 10時 -> 日本時間で 7時 / 19時
+    - cron: '0 22,10 * * *'
+  # 手動実行もできるように
+  workflow_dispatch: {}
+
+jobs:
+  fetch_ai_news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run AI news fetcher
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python ai_news_fetcher.py
