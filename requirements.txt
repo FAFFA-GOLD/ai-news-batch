@@ -1,2 +1,4 @@
 feedparser
 supabase
+requests
+beautifulsoup4
