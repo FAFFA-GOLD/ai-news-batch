@@ -47,11 +47,6 @@ FEEDS = [
         "source": "Zenn LLM",
         "url": "https://zenn.dev/topics/llm/feed",
     },
-    # ここに個人ブログ・技術ブログなどを追加していく想定:
-    # {"source": "Example AI Blog", "url": "https://example.com/feed"},
-    #
-    # ※ X(Twitter) や一部のSNSは公式RSSがないので、
-    #   後で別の方法（API / スクレイピング）で拡張していくイメージです。
 ]
 
 
@@ -88,7 +83,13 @@ def save_entry(feed_source: str, entry) -> None:
     summary = getattr(entry, "summary", None)
     content_raw = summary  # ひとまず summary を生テキストとして入れておく
 
-    published_at = parse_published(entry)
+    published_dt = parse_published(entry)
+
+    # Supabase SDK に渡す前に文字列に変換（datetime はそのままでは JSON にならない）
+    if published_dt is not None:
+        published_at = published_dt.isoformat()  # 例: "2025-11-21T08:15:00+00:00"
+    else:
+        published_at = None
 
     # 既存 URL チェック（重複防止）
     existing = (
@@ -108,7 +109,7 @@ def save_entry(feed_source: str, entry) -> None:
         "title": title,
         "summary": summary,
         "content_raw": content_raw,
-        "published_at": published_at,  # None でもOK
+        "published_at": published_at,  # ここは文字列 or None
         # category / tags / importance などは後で LLM で埋める想定
     }
 
